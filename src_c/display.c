@@ -1004,10 +1004,13 @@ pg_set_mode(PyObject *self, PyObject *arg, PyObject *kwds)
     char *title = state->title;
     int init_flip = 0;
     char *scale_env;
+    char *window_handle_str = NULL;
+    Py_ssize_t window_handle = 0;
 
     char *keywords[] = {"size", "flags", "depth", "display", "vsync", NULL};
 
     scale_env = SDL_getenv("PYGAME_FORCE_SCALE");
+    window_handle_str = SDL_getenv("SDL_WINDOWID");
 
     if (!PyArg_ParseTupleAndKeywords(arg, kwds, "|(ii)iiii", keywords, &w, &h,
                                      &flags, &depth, &display, &vsync))
@@ -1210,7 +1213,17 @@ pg_set_mode(PyObject *self, PyObject *arg, PyObject *kwds)
 
             if (!win) {
                 /*open window*/
-                win = SDL_CreateWindow(title, x, y, w_1, h_1, sdl_flags);
+                if (window_handle_str && sscanf(window_handle_str, "%zu", &window_handle) == 1) {
+                    /* Create from a native window handle.
+                    Looks at the SDL1 environment variable:
+                        - SDL_WINDOWID
+                            "hwnd"
+                    */
+                    win = SDL_CreateWindowFrom((const void *)window_handle);
+                }
+                else {
+                    win = SDL_CreateWindow(title, x, y, w_1, h_1, sdl_flags);
+                }
                 if (!win)
                     return RAISE(pgExc_SDLError, SDL_GetError());
                 init_flip = 1;
@@ -2499,6 +2512,8 @@ pg_toggle_fullscreen(PyObject *self, PyObject *args)
     GL_glViewport_Func p_glViewport = NULL;
     SDL_SysWMinfo wm_info;
     SDL_RendererInfo r_info;
+    char *window_handle_str = SDL_getenv("SDL_WINDOWID");
+    Py_ssize_t window_handle = 0;
 
     VIDEO_INIT_CHECK();
     if (!win)
@@ -2689,7 +2704,12 @@ pg_toggle_fullscreen(PyObject *self, PyObject *args)
                              1) != 0) {
                 return NULL;
             }
-            win = SDL_CreateWindow(state->title, wx, wy, w, h, 0);
+            if (window_handle_str && sscanf(window_handle_str, "%zu", &window_handle) == 1) {
+                win = SDL_CreateWindowFrom((const void *)window_handle);
+            }
+            else {
+                win = SDL_CreateWindow(state->title, wx, wy, w, h, 0);
+            }
             if (win == NULL) {
                 return RAISE(pgExc_SDLError, SDL_GetError());
             }
@@ -2794,9 +2814,14 @@ pg_toggle_fullscreen(PyObject *self, PyObject *args)
             display_surface->surf = SDL_GetWindowSurface(win);
             if (w != display_surface->surf->w ||
                 h != display_surface->surf->h) {
-                int wx = SDL_WINDOWPOS_UNDEFINED_DISPLAY(window_display);
-                int wy = SDL_WINDOWPOS_UNDEFINED_DISPLAY(window_display);
-                win = SDL_CreateWindow(state->title, wx, wy, w, h, 0);
+                if (window_handle_str && sscanf(window_handle_str, "%zu", &window_handle) == 1) {
+                    win = SDL_CreateWindowFrom((const void *)window_handle);
+                }
+                else {
+                    int wx = SDL_WINDOWPOS_UNDEFINED_DISPLAY(window_display);
+                    int wy = SDL_WINDOWPOS_UNDEFINED_DISPLAY(window_display);
+                    win = SDL_CreateWindow(state->title, wx, wy, w, h, 0);
+                }
                 if (win == NULL) {
                     return RAISE(pgExc_SDLError, SDL_GetError());
                 }

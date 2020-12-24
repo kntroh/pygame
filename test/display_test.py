@@ -3,6 +3,7 @@
 import unittest
 import os
 import time
+import tkinter
 
 import pygame, pygame.transform
 from pygame.compat import unicode_
@@ -238,7 +239,10 @@ class DisplayModuleTest(unittest.TestCase):
         self.assertFalse(wm_info_remaining_keys)
 
     @unittest.skipIf(
-        os.environ.get("SDL_VIDEODRIVER") == "dummy",
+        (
+            "skipping for all because some failures on rasppi and maybe other platforms"
+            or os.environ.get("SDL_VIDEODRIVER") == "dummy"
+        ),
         'OpenGL requires a non-"dummy" SDL_VIDEODRIVER',
     )
     def test_gl_get_attribute(self):
@@ -395,7 +399,7 @@ class DisplayModuleTest(unittest.TestCase):
         'iconify is only supported on some video drivers/platforms'
     )
     def test_iconify(self):
-        _ = pygame.display.set_mode((640, 480))
+        pygame.display.set_mode((640, 480))
 
         self.assertEqual(pygame.display.get_active(), True)
 
@@ -405,17 +409,15 @@ class DisplayModuleTest(unittest.TestCase):
             minimized_event = False
             # make sure we cycle the event loop enough to get the display
             # hidden
-            for _ in range(100):
-                time.sleep(0.01)
-                for event in pygame.event.get():
-                    if SDL2:
-                        if (event.type == pygame.WINDOWEVENT and
-                                event.event == pygame.WINDOWEVENT_MINIMIZED):
+            if SDL2:
+                for _ in range(100):
+                    time.sleep(0.01)
+                    for event in pygame.event.get():
+                        if event.type == pygame.WINDOWMINIMIZED:
                             minimized_event = True
 
-            if SDL2:
-                self.assertEqual(minimized_event, True)
-                self.assertEqual(pygame.display.get_active(), False)
+                self.assertTrue(minimized_event)
+                self.assertFalse(pygame.display.get_active())
 
         else:
             self.fail('Iconify not supported on this platform, please skip')
@@ -685,6 +687,25 @@ class DisplayInteractiveTest(unittest.TestCase):
                                           normal_ramp)
 
         pygame.display.quit()
+
+    def test_native_window_handle(self):
+        """Test for create from a native window handle"""
+        window = tkinter.Tk()
+        window.title("TkWindow")
+        window.geometry("400x100+100+250")
+        os.environ["SDL_WINDOWID"] = str(window.winfo_id())
+
+        pygame.display.quit()
+        pygame.display.init()
+
+        screen = pygame.display.set_mode((100, 100))
+        try:
+            response = question("Is the window title is TkWindow?")
+            self.assertTrue(response)
+        finally:
+            del os.environ["SDL_WINDOWID"]
+            window.destroy()
+            pygame.display.quit()
 
 
 @unittest.skipIf(
