@@ -3,6 +3,7 @@
 import unittest
 import os
 import time
+import tkinter
 
 import pygame, pygame.transform
 from pygame.compat import unicode_
@@ -686,6 +687,25 @@ class DisplayInteractiveTest(unittest.TestCase):
                                           normal_ramp)
 
         pygame.display.quit()
+
+    def test_native_window_handle(self):
+        """Test for create from a native window handle"""
+        window = tkinter.Tk()
+        window.title("TkWindow")
+        window.geometry("400x100+100+250")
+        os.environ["SDL_WINDOWID"] = str(window.winfo_id())
+
+        pygame.display.quit()
+        pygame.display.init()
+
+        screen = pygame.display.set_mode((100, 100))
+        try:
+            response = question("Is the window title is TkWindow?")
+            self.assertTrue(response)
+        finally:
+            del os.environ["SDL_WINDOWID"]
+            window.destroy()
+            pygame.display.quit()
 
 
 @unittest.skipIf(
